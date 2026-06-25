@@ -50,43 +50,14 @@
     #notify-btn.on{border-color:var(--green);color:var(--green)}
 
     /* ─── SETUP PANEL ─── */
-    #setup{margin:16px;display:flex;flex-direction:column;gap:10px}
-    #setup h2{font-size:.78rem;color:var(--muted);letter-spacing:.06em;text-transform:uppercase}
-
-    .input-row{display:flex;gap:8px}
-    #gdrive-input{
-      flex:1;background:var(--surface2);border:1px solid var(--border);
-      color:var(--text);font-size:.82rem;padding:10px 12px;
-      border-radius:9px;outline:none;font-family:var(--mono);
+    #setup{margin:16px 16px 8px}
+    #run-btn{
+      width:100%;background:var(--accent);color:#fff;border:none;
+      padding:14px;border-radius:12px;font-size:.95rem;
+      font-weight:700;cursor:pointer;font-family:var(--sans);letter-spacing:.04em;
     }
-    #gdrive-input::placeholder{color:var(--muted)}
-    #gdrive-input:focus{border-color:var(--accent)}
-
-    #save-btn,#run-btn{
-      background:var(--accent);color:#fff;border:none;
-      padding:10px 16px;border-radius:9px;font-size:.82rem;
-      font-weight:700;cursor:pointer;white-space:nowrap;
-      font-family:var(--sans);letter-spacing:.03em;
-    }
-    #run-btn{width:100%;padding:14px;font-size:.92rem;letter-spacing:.04em}
     #run-btn:disabled{opacity:.3;cursor:not-allowed}
-    button:not(:disabled):active{transform:scale(.97)}
-
-    .hint{
-      font-size:.72rem;color:var(--muted);line-height:1.6;
-      background:var(--surface);border:1px solid var(--border);
-      border-radius:8px;padding:10px 13px;
-    }
-    .hint code{
-      font-family:var(--mono);color:var(--accent);
-      background:rgba(59,130,246,.1);padding:1px 4px;border-radius:3px;
-    }
-    .hint details summary{cursor:pointer;user-select:none}
-    .hint details pre{
-      margin-top:10px;font-family:var(--mono);font-size:.68rem;
-      color:var(--accent);background:rgba(0,0,0,.3);
-      padding:10px 12px;border-radius:6px;line-height:1.9;white-space:pre-wrap;
-    }
+    #run-btn:not(:disabled):active{transform:scale(.98)}
 
     /* ─── STATUS ─── */
     #status{
@@ -159,38 +130,7 @@
 
 <!-- SETUP -->
 <div id="setup">
-  <h2>Google Drive Source</h2>
-
-  <div class="input-row">
-    <input id="gdrive-input" type="url" inputmode="url"
-           placeholder="Paste Google Drive share link or File ID…"
-           value="" />
-    <button id="save-btn" onclick="saveFileId()">Save</button>
-  </div>
-
-  <div class="hint">
-    <details>
-      <summary>▸ How to get the link &amp; .md format</summary>
-      <pre><b>1. Share link (Drive → Share → "Anyone with link")</b>
-https://drive.google.com/file/d/FILE_ID/view
-
-<b>2. Your portfolio.md format:</b>
-Title: Investing_Inventory_Investments
-Structure:
-Ticker, Name
-Purchase date, Quantity, Purchase Price
-
-ICLN, iShares Global Clean Energy ETF
-2025-03-24,1,11.68
-2026-06-05,2,21.58
-
-AAPL, Apple Inc
-2024-01-10,5,185.20</pre>
-    </details>
-    Format per lot: <code>YYYY-MM-DD,quantity,price_per_share</code>
-  </div>
-
-  <button id="run-btn" onclick="runAnalysis()" disabled>Refresh &amp; Analyze</button>
+  <button id="run-btn" onclick="runAnalysis()">Refresh &amp; Analyze</button>
 </div>
 
 <div id="status"></div>
@@ -220,70 +160,23 @@ AAPL, Apple Inc
 
 <script>
 // ─── CONSTANTS ───────────────────────────────────────────────
-const LS_KEY  = 'portfolio_gdrive_id';
-const YAHOO   = 'https://query1.finance.yahoo.com/v8/finance/chart/';
+const PORTFOLIO_URL = 'https://raw.githubusercontent.com/Cubujuqui/portfolio-app/main/Investing_Inventory_Investments.md';
+const YAHOO         = 'https://query1.finance.yahoo.com/v8/finance/chart/';
 
 // ─── INIT ─────────────────────────────────────────────────────
-let storedId  = localStorage.getItem(LS_KEY) || '';
-let lastRows  = [];
-let swReg     = null;
+let lastRows = [];
+let swReg    = null;
 
-if (storedId) {
-  document.getElementById('gdrive-input').value = storedId;
-  document.getElementById('run-btn').disabled    = false;
-}
 registerSW();
 
-// ─── FILE ID HELPERS ──────────────────────────────────────────
-function extractFileId(raw) {
-  raw = raw.trim();
-  // Full share URL
-  const m = raw.match(/\/d\/([a-zA-Z0-9_-]{20,})/);
-  if (m) return m[1];
-  // Direct export/open URL
-  const m2 = raw.match(/[?&]id=([a-zA-Z0-9_-]{20,})/);
-  if (m2) return m2[1];
-  // Already a bare ID
-  if (/^[a-zA-Z0-9_-]{20,}$/.test(raw)) return raw;
-  return null;
-}
+// ─── FILE SOURCE: GitHub raw ─────────────────────────────────
 
-function saveFileId() {
-  const raw = document.getElementById('gdrive-input').value;
-  const id  = extractFileId(raw);
-  if (!id) { setStatus('Could not parse a File ID from that link.', 'err'); return; }
-  storedId = id;
-  localStorage.setItem(LS_KEY, id);
-  document.getElementById('run-btn').disabled = false;
-  setStatus(`✓ File ID saved: ${id.slice(0,12)}…`, 'ok');
-}
-
-// ─── FETCH MD FROM GOOGLE DRIVE ───────────────────────────────
-// Google Drive blocks direct fetch() on mobile Safari due to CORS.
-// We use allorigins as a relay — it only sees the public file text,
-// never your portfolio numbers (those are computed locally).
-async function fetchMDFromDrive(fileId) {
-  const driveUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
-  const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(driveUrl)}`;
-
-  // Strategy 1: direct fetch (works on desktop / some browsers)
-  try {
-    const res = await fetch(driveUrl, { signal: AbortSignal.timeout(8000) });
-    if (res.ok) {
-      const text = await res.text();
-      if (!text.includes('<!DOCTYPE') && !text.includes('<html')) return text;
-    }
-  } catch (_) {}
-
-  // Strategy 2: CORS proxy (works on mobile Safari)
-  const res2 = await fetch(proxyUrl, { signal: AbortSignal.timeout(14000) });
-  if (!res2.ok) throw new Error(`Could not reach proxy (HTTP ${res2.status}). Check your internet connection.`);
-  const json = await res2.json();
-  const text = json.contents ?? '';
-  if (text.includes('<!DOCTYPE') || text.includes('<html'))
-    throw new Error('Google returned an HTML page. Make sure the file is shared as "Anyone with the link".');
-  if (!text.trim())
-    throw new Error('File appears empty. Check the Drive link.');
+// ─── FETCH PORTFOLIO FROM GITHUB ─────────────────────────────
+async function fetchMDFromDrive() {
+  const res = await fetch(PORTFOLIO_URL + '?t=' + Date.now());
+  if (!res.ok) throw new Error(`Could not load portfolio file (HTTP ${res.status}). Check your internet connection.`);
+  const text = await res.text();
+  if (!text.trim()) throw new Error('Portfolio file appears empty.');
   return text;
 }
 
@@ -366,16 +259,14 @@ async function fetchQuote(ticker) {
 
 // ─── MAIN ─────────────────────────────────────────────────────
 async function runAnalysis() {
-  if (!storedId) { setStatus('Save a Drive link first.', 'err'); return; }
-
   const btn = document.getElementById('run-btn');
   btn.disabled = true;
   document.getElementById('results').style.display = 'none';
-  setStatus('<span class="dots">Loading portfolio from Drive</span>');
+  setStatus('<span class="dots">Loading portfolio</span>');
 
   let port;
   try {
-    const md = await fetchMDFromDrive(storedId);
+    const md = await fetchMDFromDrive();
     port = parseMD(md);
     const n = Object.keys(port).length;
     if (!n) throw new Error('No tickers found — check your .md format.');
