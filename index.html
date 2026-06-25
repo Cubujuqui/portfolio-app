@@ -42,12 +42,6 @@
     }
     .h-row{display:flex;align-items:center;justify-content:space-between;gap:8px}
     header h1{font-size:.95rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--accent)}
-    #notify-btn{
-      background:none;border:1px solid var(--border);color:var(--muted);
-      font-size:.65rem;padding:5px 9px;border-radius:6px;cursor:pointer;
-      font-family:var(--mono);letter-spacing:.05em;white-space:nowrap;
-    }
-    #notify-btn.on{border-color:var(--green);color:var(--green)}
 
     /* ─── SETUP PANEL ─── */
     #setup{margin:16px 16px 8px}
@@ -58,6 +52,13 @@
     }
     #run-btn:disabled{opacity:.3;cursor:not-allowed}
     #run-btn:not(:disabled):active{transform:scale(.98)}
+    #notify-btn{
+      width:100%;background:none;border:1px solid var(--border);
+      color:var(--muted);font-size:.78rem;padding:10px;
+      border-radius:10px;cursor:pointer;font-family:var(--mono);
+      letter-spacing:.05em;margin-top:8px;
+    }
+    #notify-btn.on{border-color:var(--green);color:var(--green)}
 
     /* ─── STATUS ─── */
     #status{
@@ -124,13 +125,13 @@
 <header>
   <div class="h-row">
     <h1>📈 Portfolio</h1>
-    <button id="notify-btn" onclick="requestNotify()">🔔 Enable Alerts</button>
   </div>
 </header>
 
 <!-- SETUP -->
 <div id="setup">
   <button id="run-btn" onclick="runAnalysis()">Refresh &amp; Analyze</button>
+  <button id="notify-btn" onclick="requestNotify()">🔔 Enable Alerts</button>
 </div>
 
 <div id="status"></div>
@@ -161,7 +162,7 @@
 <script>
 // ─── CONSTANTS ───────────────────────────────────────────────
 const PORTFOLIO_URL = 'https://raw.githubusercontent.com/Cubujuqui/portfolio-app/main/Investing_Inventory_Investments.md';
-const YAHOO         = 'https://query1.finance.yahoo.com/v8/finance/chart/';
+const WORKER        = 'https://shiny-fire-b99b.cubujuqui-account.workers.dev/';
 
 // ─── INIT ─────────────────────────────────────────────────────
 let lastRows = [];
@@ -244,16 +245,16 @@ function parseISO(s) {
   return m ? new Date(`${m[1]}-${m[2]}-${m[3]}T12:00:00`) : null;
 }
 
-// ─── YAHOO FINANCE ────────────────────────────────────────────
+// ─── PRICE FETCH VIA CLOUDFLARE WORKER ───────────────────────
 async function fetchQuote(ticker) {
-  const res  = await fetch(`${YAHOO}${ticker}?interval=1d&range=5d`);
+  const res  = await fetch(`${WORKER}?ticker=${ticker}`);
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   const data = await res.json();
   const meta = data?.chart?.result?.[0]?.meta;
   if (!meta) throw new Error('No data');
-  const price    = meta.regularMarketPrice ?? meta.chartPreviousClose;
-  const prev     = meta.chartPreviousClose ?? meta.previousClose;
-  const dayChg   = prev ? ((price - prev) / prev) * 100 : 0;
+  const price  = meta.regularMarketPrice ?? meta.chartPreviousClose;
+  const prev   = meta.chartPreviousClose ?? meta.previousClose;
+  const dayChg = prev ? ((price - prev) / prev) * 100 : 0;
   return { price, dayChg, currency: meta.currency ?? 'USD', name: meta.shortName ?? ticker };
 }
 
