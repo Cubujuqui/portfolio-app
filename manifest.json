@@ -2,7 +2,7 @@
   "name": "Portfolio Tracker",
   "short_name": "Portfolio",
   "description": "Stock portfolio P&L tracker with live prices",
-  "start_url": "/",
+  "start_url": "/portfolio-app/",
   "display": "standalone",
   "orientation": "portrait",
   "background_color": "#0a0e1a",
