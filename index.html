@@ -258,17 +258,32 @@ function saveFileId() {
   setStatus(`✓ File ID saved: ${id.slice(0,12)}…`, 'ok');
 }
 
-// ─── FETCH MD FROM GOOGLE DRIVE (public file) ─────────────────
+// ─── FETCH MD FROM GOOGLE DRIVE ───────────────────────────────
+// Google Drive blocks direct fetch() on mobile Safari due to CORS.
+// We use allorigins as a relay — it only sees the public file text,
+// never your portfolio numbers (those are computed locally).
 async function fetchMDFromDrive(fileId) {
-  // Use the public export URL — works for files shared as "anyone with link"
-  const url = `https://drive.google.com/uc?export=download&id=${fileId}`;
-  const res  = await fetch(url);
-  if (!res.ok) throw new Error(`Drive fetch failed (HTTP ${res.status}). Make sure the file is shared as "Anyone with link".`);
-  const text = await res.text();
-  // Detect Google's virus-scan warning page
-  if (text.includes('Google Drive - Virus scan warning') || text.includes('confirm=') && text.includes('DOCTYPE')) {
-    throw new Error('Google returned a virus-scan page. Open the link in Safari once to accept, then retry.');
-  }
+  const driveUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
+  const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(driveUrl)}`;
+
+  // Strategy 1: direct fetch (works on desktop / some browsers)
+  try {
+    const res = await fetch(driveUrl, { signal: AbortSignal.timeout(8000) });
+    if (res.ok) {
+      const text = await res.text();
+      if (!text.includes('<!DOCTYPE') && !text.includes('<html')) return text;
+    }
+  } catch (_) {}
+
+  // Strategy 2: CORS proxy (works on mobile Safari)
+  const res2 = await fetch(proxyUrl, { signal: AbortSignal.timeout(14000) });
+  if (!res2.ok) throw new Error(`Could not reach proxy (HTTP ${res2.status}). Check your internet connection.`);
+  const json = await res2.json();
+  const text = json.contents ?? '';
+  if (text.includes('<!DOCTYPE') || text.includes('<html'))
+    throw new Error('Google returned an HTML page. Make sure the file is shared as "Anyone with the link".');
+  if (!text.trim())
+    throw new Error('File appears empty. Check the Drive link.');
   return text;
 }
 
