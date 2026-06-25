@@ -145,12 +145,12 @@
       <thead>
         <tr>
           <th>Ticker</th>
-          <th>Purchase Date</th>
-          <th style="text-align:right">Qty</th>
-          <th style="text-align:right">Buy Price</th>
-          <th style="text-align:right">Curr Price</th>
           <th style="text-align:right">USD Var</th>
           <th style="text-align:right">% Var</th>
+          <th style="text-align:right">Qty</th>
+          <th>Purchase Date</th>
+          <th style="text-align:right">Buy Price</th>
+          <th style="text-align:right">Curr Price</th>
         </tr>
       </thead>
       <tbody id="lot-tbody"></tbody>
@@ -360,12 +360,12 @@ function renderResults(rows, errors) {
     const pCls = r.pctVar >= 0 ? 'pos-val' : 'neg-val';
     return `<tr>
       <td class="ticker">${r.ticker}</td>
-      <td>${fmtDate(r.date)}</td>
-      <td class="num">${r.qty}</td>
-      <td class="num">$${r.buyPrice.toFixed(2)}</td>
-      <td class="num">$${r.currPrice.toFixed(2)}</td>
       <td class="${uCls}">${sign(r.usdVar)}$${fmt(Math.abs(r.usdVar))}</td>
       <td class="${pCls}">${sign(r.pctVar)}${r.pctVar.toFixed(2)}%</td>
+      <td class="num">${r.qty}</td>
+      <td>${fmtDate(r.date)}</td>
+      <td class="num">$${r.buyPrice.toFixed(2)}</td>
+      <td class="num">$${r.currPrice.toFixed(2)}</td>
     </tr>`;
   }).join('');
 
@@ -382,8 +382,8 @@ function renderResults(rows, errors) {
 function copyReport() {
   if (!lastRows.length) return;
   const now   = new Date().toLocaleString();
-  const W     = [8, 12, 5, 11, 11, 12, 9];
-  const H     = ['TICKER','PURCHASE DATE','QTY','BUY PRICE','CURR PRICE','USD VAR','% VAR'];
+  const W     = [8, 12, 9, 5, 12, 11, 11];
+  const H     = ['TICKER','USD VAR','% VAR','QTY','PURCHASE DATE','BUY PRICE','CURR PRICE'];
   const sep   = W.map(w => '─'.repeat(w)).join('─┼─');
   const hdr   = H.map((h,i) => h.padEnd(W[i])).join(' │ ');
   const lines = [
@@ -393,12 +393,12 @@ function copyReport() {
     sep,
     ...lastRows.map(r => [
       r.ticker.padEnd(W[0]),
-      fmtDate(r.date).padEnd(W[1]),
-      String(r.qty).padEnd(W[2]),
-      `$${r.buyPrice.toFixed(2)}`.padEnd(W[3]),
-      `$${r.currPrice.toFixed(2)}`.padEnd(W[4]),
-      (`${sign(r.usdVar)}$${fmt(Math.abs(r.usdVar))}`).padEnd(W[5]),
-      (`${sign(r.pctVar)}${r.pctVar.toFixed(2)}%`).padEnd(W[6]),
+      (`${sign(r.usdVar)}$${fmt(Math.abs(r.usdVar))}`).padEnd(W[1]),
+      (`${sign(r.pctVar)}${r.pctVar.toFixed(2)}%`).padEnd(W[2]),
+      String(r.qty).padEnd(W[3]),
+      fmtDate(r.date).padEnd(W[4]),
+      `$${r.buyPrice.toFixed(2)}`.padEnd(W[5]),
+      `$${r.currPrice.toFixed(2)}`.padEnd(W[6]),
     ].join(' │ ')),
     sep,
   ];
